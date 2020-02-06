@@ -1,6 +1,8 @@
 #pragma once
 #include <iostream>
 #include <vector>
+#include <ctime>
+#include <chrono>
 
 typedef unsigned char uchar;
 typedef signed char schar;
@@ -9,6 +11,7 @@ typedef unsigned short ushort;
 #define RAM_SIZE 256
 #define ROM_SIZE 4 * 1024
 #define OPCODES_SIZE 256
+#define MAX_CYCLES_PER_SECOND 1000000
 
 #define get16hex(mem, idx) (((ushort)(mem[idx] << 8)) | mem[idx + 1])
 
@@ -46,6 +49,13 @@ private:
 	uchar PSW_OV();		//Overflow
 	uchar PSW_P();		//Parity - Set to 1 if A has odd # of 1's; otherwise reset
 
+	void setPSW_C(uchar b);		//Set Carry
+	void setPSW_AC(uchar b);		//Set Auxilary Carry
+	void setPSW_F0(uchar b);		//Set Flag 0
+	void setPSW_RS1(uchar b);		//Set Register bank selection bit 1
+	void setPSW_RS0(uchar b);		//Set Register bank selection bit 1
+	void setPSW_OV(uchar b);		//Set Overflow
+	void setPSW_P(uchar b);		//Set Parity - Set to 1 if A has odd # of 1's; otherwise reset
 //Members
 private:
 	static cpu* instance;
