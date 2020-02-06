@@ -598,9 +598,8 @@ void cpu::opcode_7D() {}
 void cpu::opcode_7E() {}
 void cpu::opcode_7F() {}
 void cpu::opcode_80() {
-	++pc;
-	schar offset = (schar)rom[pc++];
-	pc = pc + offset;
+	pc += 2;
+	pc = pc + (schar)rom[pc - 1];
 }
 void cpu::opcode_81() {}
 void cpu::opcode_82() {}
@@ -691,11 +690,9 @@ void cpu::opcode_D6() {}
 void cpu::opcode_D7() {}
 void cpu::opcode_D8() {
 	++pc;
-	schar value = (schar)ram[r0];
-	value -= 1;
+	ram[r0] -= 1;
 	schar offset = (schar)rom[pc++];
-	if (value != 0) {
-		ram[r0] = value;
+	if (ram[r0] != 0) {
 		pc = pc + offset;
 	}
 }
