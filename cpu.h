@@ -15,15 +15,112 @@ typedef unsigned short ushort;
 
 #define get16hex(mem, idx) (((ushort)(mem[idx] << 8)) | mem[idx + 1])
 
+typedef void callBackForEveryCycle_t(void*);
+
 class cpu
 {
 public:
 	typedef void (cpu::* opcodeHandler_t)();
 
 	static cpu* getInstance();
-	bool initialize(const std::string& fileName);
+	bool initialize(const std::string& fileName, callBackForEveryCycle_t callback, void* obj);
 	void emulateCycle();
 	void dumpPort1();
+	void stopEmulation();
+
+	uchar PSW_C();		//Carry
+	uchar PSW_AC();		//Auxilary Carry
+	uchar PSW_F0();		//Flag 0
+	uchar PSW_RS1();	//Register bank selection bit 1
+	uchar PSW_RS0();	//Register bank selection bit 1
+	uchar PSW_OV();		//Overflow
+	uchar PSW_P();		//Parity - Set to 1 if A has odd # of 1's; otherwise reset
+
+	uchar getP0() {
+		return ram[p0];
+	}
+	uchar getP1() {
+		return ram[p1];
+	}
+	uchar getP2() {
+		return ram[p2];
+	}
+	uchar getP3() {
+		return ram[p3];
+	}
+
+	uchar getR0() {
+		return ram[r0];
+	}
+	uchar getR1() {
+		return ram[r1];
+	}
+	uchar getR2() {
+		return ram[r2];
+	}
+	uchar getR3() {
+		return ram[r3];
+	}
+	uchar getR4() {
+		return ram[r4];
+	}
+	uchar getR5() {
+		return ram[r5];
+	}
+	uchar getR6() {
+		return ram[r6];
+	}
+	uchar getR7() {
+		return ram[r7];
+	}
+
+	uchar getB() {
+		return ram[b];
+	}
+	uchar getACC() {
+		return ram[acc];
+	}
+	uchar getIP() {
+		return ram[ip];
+	}
+	uchar getIE() {
+		return ram[ie];
+	}
+	uchar getTMOD() {
+		return ram[tmod];
+	}
+	uchar getTCON() {
+		return ram[tcon];
+	}
+	uchar getPCON() {
+		return ram[pcon];
+	}
+	uchar getDPH() {
+		return ram[dph];
+	}
+	uchar getDPL() {
+		return ram[dpl];
+	}
+	uchar getSP() {
+		return ram[sp];
+	}
+
+	ushort getPC() {
+		return pc;
+	}
+
+	uchar getTH0() {
+		return ram[th0];
+	}
+	uchar getTH1() {
+		return ram[th1];
+	}
+	uchar getTL0() {
+		return ram[tl0];
+	}
+	uchar getTL1() {
+		return ram[tl1];
+	}
 
 private:
 	cpu() = default;
@@ -40,15 +137,7 @@ private:
 	void clearSpecialCharacters(FILE* fp, uchar& ch);
 	uchar asciiToHex(uchar ch);
 	void initOpcodeArray();
-
-	uchar PSW_C();		//Carry
-	uchar PSW_AC();		//Auxilary Carry
-	uchar PSW_F0();		//Flag 0
-	uchar PSW_RS1();	//Register bank selection bit 1
-	uchar PSW_RS0();	//Register bank selection bit 1
-	uchar PSW_OV();		//Overflow
-	uchar PSW_P();		//Parity - Set to 1 if A has odd # of 1's; otherwise reset
-
+	
 	void setPSW_C(uchar b);		//Set Carry
 	void setPSW_AC(uchar b);		//Set Auxilary Carry
 	void setPSW_F0(uchar b);		//Set Flag 0
@@ -56,6 +145,9 @@ private:
 	void setPSW_RS0(uchar b);		//Set Register bank selection bit 1
 	void setPSW_OV(uchar b);		//Set Overflow
 	void setPSW_P(uchar b);		//Set Parity - Set to 1 if A has odd # of 1's; otherwise reset
+
+	ushort getDPTR();
+	void setDPTR(ushort a);
 //Members
 private:
 	static cpu* instance;
@@ -359,5 +451,10 @@ private:
 	uchar ram[RAM_SIZE];
 	uchar rom[ROM_SIZE];
 	ushort pc;
+
+	//Callback
+	void* callbackFunc;
+	void* client;
+	bool stop = false;
 };
 

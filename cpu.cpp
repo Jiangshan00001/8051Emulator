@@ -11,10 +11,13 @@ cpu* cpu::getInstance()
 	return instance;
 }
 
-bool cpu::initialize(const std::string& fileName)
+bool cpu::initialize(const std::string& fileName, callBackForEveryCycle_t callback, void* obj)
 {
 	clear();
 	initOpcodeArray();
+	callbackFunc = callback;
+	client = obj;
+	stop = false;
 
 	ram[sp] = stack_start;
 	pc = 0x0000;
@@ -27,18 +30,24 @@ void cpu::emulateCycle()
 {
 	long cyclesRemaining = MAX_CYCLES_PER_SECOND;
 	auto start = std::chrono::high_resolution_clock::now();
-	while (cyclesRemaining > 0) {
-		auto func = opcodeHandler[rom[pc]];
-		++pc;
-		(this->*func)();
-		cyclesRemaining--;
-		cpu::getInstance()->dumpPort1();
-	}
-	while (true) {
-		auto end = std::chrono::high_resolution_clock::now();
-		auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-		if (duration.count() > 1) {
-			break;
+	while (!stop) {
+		if (cyclesRemaining > 0) {
+			auto func = opcodeHandler[rom[pc]];
+			++pc;
+			(this->*func)();
+			cyclesRemaining--;
+		}
+		else {
+			if (cyclesRemaining == 0) {
+				(*(callBackForEveryCycle_t*)callbackFunc)(client);
+				cyclesRemaining = MAX_CYCLES_PER_SECOND;
+			}
+			//auto end = std::chrono::high_resolution_clock::now();
+			//auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+			//if (duration.count() > 1) {
+			//	cyclesRemaining = MAX_CYCLES_PER_SECOND;
+			//	start = std::chrono::high_resolution_clock::now();
+			//}
 		}
 	}
 }
@@ -46,6 +55,11 @@ void cpu::emulateCycle()
 void cpu::dumpPort1()
 {
 	std::cout << std::bitset<8>(ram[p1]) << std::endl;
+}
+
+void cpu::stopEmulation()
+{
+	stop = true;
 }
 
 void cpu::clear()
@@ -503,6 +517,19 @@ void cpu::setPSW_P(uchar b)
 	ram[psw] = ram[psw] & b;
 }
 
+ushort cpu::getDPTR()
+{
+	ushort a = ram[dpl];
+	a = (ram[dph] << 8) | a;
+	return a;
+}
+
+void cpu::setDPTR(ushort a)
+{
+	ram[dpl] = (uchar)(a & 0x0F);
+	ram[dph] = (uchar)(a >> 8);
+}
+
 //opcode handlers
 void cpu::opcode_00() {}
 void cpu::opcode_01() {}
@@ -607,7 +634,10 @@ void cpu::opcode_23() {
 	ram[acc] <<= 1;
 	ram[acc] |= temp;
 }
-void cpu::opcode_24() {}
+void cpu::opcode_24() {
+	auto d = rom[pc++];
+	setPSW_C(((short)ram[acc] + (short)d) > 255);
+}
 void cpu::opcode_25() {}
 void cpu::opcode_26() {}
 void cpu::opcode_27() {}
@@ -943,7 +973,9 @@ void cpu::opcode_AF() {
 void cpu::opcode_B0() {}
 void cpu::opcode_B1() {}
 void cpu::opcode_B2() {}
-void cpu::opcode_B3() {}
+void cpu::opcode_B3() {
+	setPSW_C(~PSW_C());
+}
 void cpu::opcode_B4() {}
 void cpu::opcode_B5() {}
 void cpu::opcode_B6() {}
@@ -1141,9 +1173,15 @@ void cpu::opcode_EF() {
 }
 void cpu::opcode_F0() {}
 void cpu::opcode_F1() {}
-void cpu::opcode_F2() {}
-void cpu::opcode_F3() {}
-void cpu::opcode_F4() {}
+void cpu::opcode_F2() {
+	ram[ram[r0]] = ram[acc];
+}
+void cpu::opcode_F3() {
+	ram[ram[r1]] = ram[acc];
+}
+void cpu::opcode_F4() {
+	ram[acc] = ~ram[acc];
+}
 void cpu::opcode_F5() {
 	ram[pc] = ram[acc];
 	++pc;

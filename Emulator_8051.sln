@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.29613.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Emulator_8051", "Emulator_8051.vcxproj", "{5204D1D5-D497-49F1-BD60-162407BE40C4}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EmulatorUI", "EmulatorUI\EmulatorUI.vcxproj", "{2FA429C9-584B-49A5-ABE0-1C7B0D56EE10}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,12 @@ Global
 		{5204D1D5-D497-49F1-BD60-162407BE40C4}.Release|x64.Build.0 = Release|x64
 		{5204D1D5-D497-49F1-BD60-162407BE40C4}.Release|x86.ActiveCfg = Release|Win32
 		{5204D1D5-D497-49F1-BD60-162407BE40C4}.Release|x86.Build.0 = Release|Win32
+		{2FA429C9-584B-49A5-ABE0-1C7B0D56EE10}.Debug|x64.ActiveCfg = Debug|Win32
+		{2FA429C9-584B-49A5-ABE0-1C7B0D56EE10}.Debug|x86.ActiveCfg = Debug|Win32
+		{2FA429C9-584B-49A5-ABE0-1C7B0D56EE10}.Debug|x86.Build.0 = Debug|Win32
+		{2FA429C9-584B-49A5-ABE0-1C7B0D56EE10}.Release|x64.ActiveCfg = Release|Win32
+		{2FA429C9-584B-49A5-ABE0-1C7B0D56EE10}.Release|x86.ActiveCfg = Release|Win32
+		{2FA429C9-584B-49A5-ABE0-1C7B0D56EE10}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
