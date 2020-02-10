@@ -6,6 +6,7 @@
 #include <qthread.h>
 #include "qmutex.h"
 #include "../cpu.h"
+#include "Constants.h"
 
 class Worker : public QThread {
 	Q_OBJECT

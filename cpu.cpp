@@ -484,7 +484,12 @@ uchar cpu::PSW_P()
 
 void cpu::setPSW_C(uchar b)
 {
-	ram[psw] = ram[psw] & ( b << 7);
+	if (b) {
+		ram[psw] |= 0x80;
+	}
+	else {
+		ram[psw] &= (~0x80);
+	}
 }
 
 void cpu::setPSW_AC(uchar b)
@@ -585,7 +590,7 @@ void cpu::opcode_11() {}
 void cpu::opcode_12() {}
 void cpu::opcode_13() {
 	auto temp = ram[acc] & 0x01;
-	ram[acc] >>= 7;
+	ram[acc] >>= 1;
 	ram[acc] = ram[acc] | (PSW_C());
 	setPSW_C(temp);
 }
@@ -809,7 +814,12 @@ void cpu::opcode_6E() {
 void cpu::opcode_6F() {
 	ram[acc] ^= ram[r7];
 }
-void cpu::opcode_70() {}
+void cpu::opcode_70() {
+	pc++;
+	if (ram[acc] != 0) {
+		pc = pc + (schar)rom[pc - 1];
+	}
+}
 void cpu::opcode_71() {}
 void cpu::opcode_72() {}
 void cpu::opcode_73() {}
@@ -854,8 +864,9 @@ void cpu::opcode_7F() {
 	ram[r7] = rom[pc++];
 }
 void cpu::opcode_80() {
-	pc += 1;
-	pc = pc + (schar)rom[pc - 1];
+	schar rel = (schar)ram[pc];
+	pc++;
+	pc = pc + rel;
 }
 void cpu::opcode_81() {}
 void cpu::opcode_82() {}
@@ -991,7 +1002,9 @@ void cpu::opcode_BF() {}
 void cpu::opcode_C0() {}
 void cpu::opcode_C1() {}
 void cpu::opcode_C2() {}
-void cpu::opcode_C3() {}
+void cpu::opcode_C3() {
+	setPSW_C(0x00);
+}
 void cpu::opcode_C4() {}
 void cpu::opcode_C5() {
 	auto temp = ram[acc];
@@ -1183,7 +1196,7 @@ void cpu::opcode_F4() {
 	ram[acc] = ~ram[acc];
 }
 void cpu::opcode_F5() {
-	ram[pc] = ram[acc];
+	ram[rom[pc]] = ram[acc];
 	++pc;
 }
 void cpu::opcode_F6() {

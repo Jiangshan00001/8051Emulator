@@ -82,6 +82,7 @@
   <ItemGroup>
     <ClCompile Include="..\cpu.cpp" />
     <ClCompile Include="EmulatorUI.cpp" />
+    <ClCompile Include="LEDsSequence.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -95,6 +96,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\cpu.h" />
+    <ClInclude Include="Constants.h" />
+    <QtMoc Include="LEDsSequence.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

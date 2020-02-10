@@ -34,9 +34,15 @@
     <ClCompile Include="EmulatorUI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LEDsSequence.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="EmulatorUI.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="LEDsSequence.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>
@@ -52,6 +58,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\cpu.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Constants.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

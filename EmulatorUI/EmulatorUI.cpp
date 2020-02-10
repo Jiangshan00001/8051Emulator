@@ -4,6 +4,8 @@
 #include "../cpu.h"
 #include "qthread.h"
 #include <QtConcurrent/qtconcurrentrun.h>
+#include "qgraphicsitem.h"
+#include "LEDsSequence.h"
 
 void cycleCallback(void* client) {
 	((Worker*)client)->callback();
@@ -23,8 +25,12 @@ EmulatorUI::EmulatorUI(QWidget *parent)
 	ui.actionStop->setEnabled(false);
 	isInitialized = false;
 	
+	LEDsSequence* leds = new LEDsSequence(ui.centralWidget);
+	leds->move(10, 10);
+
 	worker = new Worker(this);
 	connect(worker, SIGNAL(updateUI()), this, SLOT(displayCycle()));
+	connect(worker, SIGNAL(updateUI()), leds, SLOT(update()));
 
 	connect(ui.actionLoad, &QAction::triggered, [=]() {
 		auto name = QFileDialog::getOpenFileName(this, "Open Hex File", "", "HEX | *.hex");
