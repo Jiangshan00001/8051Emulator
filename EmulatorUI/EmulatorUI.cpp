@@ -33,11 +33,13 @@ EmulatorUI::EmulatorUI(QWidget *parent)
 	connect(worker, SIGNAL(updateUI()), leds, SLOT(update()));
 
 	connect(ui.actionLoad, &QAction::triggered, [=]() {
+		worker->stop();
 		auto name = QFileDialog::getOpenFileName(this, "Open Hex File", "", "HEX | *.hex");
 		isInitialized = cpu::getInstance()->initialize(name.toStdString(), cycleCallback, worker);
 		if (isInitialized) {
 			ui.statusBar->showMessage("Loaded " + name);
 			ui.actionRun->setEnabled(true);
+			displayCycle();
 		}
 		else {
 			ui.statusBar->showMessage("Failed to load " + name);
@@ -116,11 +118,12 @@ void EmulatorUI::displayCycle()
 	ui.tl0->setText(QString("0x%1").arg(cpu::getInstance()->getTL0(), 2, 16, QLatin1Char('0')));
 	ui.tl1->setText(QString("0x%1").arg(cpu::getInstance()->getTL1(), 2, 16, QLatin1Char('0')));
 	
-	ui.c->setText(QString("%1").arg(cpu::getInstance()->PSW_C(), 1, 2));
-	ui.ac->setText(QString("%1").arg(cpu::getInstance()->PSW_AC(), 1, 2));
-	ui.f0->setText(QString("%1").arg(cpu::getInstance()->PSW_F0(), 1, 2));
-	ui.rs1->setText(QString("%1").arg(cpu::getInstance()->PSW_RS1(), 1, 2));
-	ui.rs0->setText(QString("%1").arg(cpu::getInstance()->PSW_RS0(), 1, 2));
-	ui.ov->setText(QString("%1").arg(cpu::getInstance()->PSW_OV(), 1, 2));
-	ui.p->setText(QString("%1").arg(cpu::getInstance()->PSW_P(), 1, 2));
+	auto psw = cpu::getInstance()->getPSW();
+	ui.c->setText(QString("%1").arg(((psw >> 7) & 1), 1, 2));
+	ui.ac->setText(QString("%1").arg(((psw >> 6) & 1), 1, 2));
+	ui.f0->setText(QString("%1").arg(((psw >> 5) & 1), 1, 2));
+	ui.rs1->setText(QString("%1").arg(((psw >> 4) & 1), 1, 2));
+	ui.rs0->setText(QString("%1").arg(((psw >> 3) & 1), 1, 2));
+	ui.ov->setText(QString("%1").arg(((psw >> 2) & 1), 1, 2));
+	ui.p->setText(QString("%1").arg(((psw >> 0) & 1), 1, 2));
 }

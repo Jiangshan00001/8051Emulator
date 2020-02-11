@@ -104,6 +104,9 @@ public:
 	uchar getSP() {
 		return ram[sp];
 	}
+	uchar getPSW() {
+		return ram[psw];
+	}
 
 	ushort getPC() {
 		return pc;

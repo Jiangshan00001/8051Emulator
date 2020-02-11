@@ -28,6 +28,7 @@ bool cpu::initialize(const std::string& fileName, callBackForEveryCycle_t callba
 
 void cpu::emulateCycle()
 {
+	stop = false;
 	long cyclesRemaining = MAX_CYCLES_PER_SECOND;
 	auto start = std::chrono::high_resolution_clock::now();
 	while (!stop) {
@@ -449,32 +450,32 @@ void cpu::initOpcodeArray()
 
 uchar cpu::PSW_C()
 {
-	return ram[psw] >> 7;
+	return ram[psw] & 0x80;
 }
 
 uchar cpu::PSW_AC()
 {
-	return (ram[psw] & 0x40) >> 6;
+	return ram[psw] & 0x40;
 }
 
 uchar cpu::PSW_F0()
 {
-	return (ram[psw] & 0x20) >> 5;
+	return ram[psw] & 0x20;
 }
 
 uchar cpu::PSW_RS1()
 {
-	return (ram[psw] & 0x10) >> 6;
+	return ram[psw] & 0x10;
 }
 
 uchar cpu::PSW_RS0()
 {
-	return (ram[psw] & 0x08) >> 6;
+	return ram[psw] & 0x08;
 }
 
 uchar cpu::PSW_OV()
 {
-	return (ram[psw] & 0x04) >> 6;
+	return ram[psw] & 0x04;
 }
 
 uchar cpu::PSW_P()
@@ -494,32 +495,62 @@ void cpu::setPSW_C(uchar b)
 
 void cpu::setPSW_AC(uchar b)
 {
-	ram[psw] = ram[psw] & (b << 6);
+	if (b) {
+		ram[psw] |= 0x40;
+	}
+	else {
+		ram[psw] &= (~0x40);
+	}
 }
 
 void cpu::setPSW_F0(uchar b)
 {
-	ram[psw] = ram[psw] & (b << 5);
+	if (b) {
+		ram[psw] |= 0x20;
+	}
+	else {
+		ram[psw] &= (~0x20);
+	}
 }
 
 void cpu::setPSW_RS1(uchar b)
 {
-	ram[psw] = ram[psw] & (b << 4);
+	if (b) {
+		ram[psw] |= 0x10;
+	}
+	else {
+		ram[psw] &= (~0x10);
+	}
 }
 
 void cpu::setPSW_RS0(uchar b)
 {
-	ram[psw] = ram[psw] & (b << 3);
+	if (b) {
+		ram[psw] |= 0x08;
+	}
+	else {
+		ram[psw] &= (~0x08);
+	}
 }
 
 void cpu::setPSW_OV(uchar b)
 {
-	ram[psw] = ram[psw] & (b << 2);
+	if (b) {
+		ram[psw] |= 0x04;
+	}
+	else {
+		ram[psw] &= (~0x04);
+	}
 }
 
 void cpu::setPSW_P(uchar b)
 {
-	ram[psw] = ram[psw] & b;
+	if (b) {
+		ram[psw] |= 0x01;
+	}
+	else {
+		ram[psw] &= (~0x01);
+	}
 }
 
 ushort cpu::getDPTR()
@@ -537,7 +568,13 @@ void cpu::setDPTR(ushort a)
 
 //opcode handlers
 void cpu::opcode_00() {}
-void cpu::opcode_01() {}
+void cpu::opcode_01() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	++pc;
+	high >>= 5;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_02() {
 	ushort addr = get16hex(rom, pc);
 	pc = addr;
@@ -586,8 +623,27 @@ void cpu::opcode_0F() {
 	ram[r7] += 1;
 }
 void cpu::opcode_10() {}
-void cpu::opcode_11() {}
-void cpu::opcode_12() {}
+void cpu::opcode_11() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	high >>= 5;
+	++pc;
+	ushort address = pc;
+	ram[sp]++;
+	ram[ram[sp]] = address & 0xFF;
+	ram[sp]++;
+	ram[ram[sp]] = (address >> 8) & 0xFF;	
+	pc = (high << 8) | low;
+}
+void cpu::opcode_12() {
+	ushort address = (rom[pc] << 8) | rom[pc + 1];
+	pc += 2;
+	ram[sp]++;
+	ram[ram[sp]] = pc & 0xFF;
+	ram[sp]++;
+	ram[ram[sp]] = (pc>>8) & 0xFF;
+	pc = address;
+}
 void cpu::opcode_13() {
 	auto temp = ram[acc] & 0x01;
 	ram[acc] >>= 1;
@@ -632,46 +688,224 @@ void cpu::opcode_1F() {
 	ram[r7] -= 1;
 }
 void cpu::opcode_20() {}
-void cpu::opcode_21() {}
-void cpu::opcode_22() {}
+void cpu::opcode_21() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	high >>= 5;
+	++pc;
+	pc = (high << 8) | low;
+}
+void cpu::opcode_22() {
+	ushort address = ram[ram[sp]] << 8;
+	ram[sp]--;
+	address |= ram[ram[sp]];
+	ram[sp]--;
+	pc = address;
+}
 void cpu::opcode_23() {
 	auto temp = ram[acc] & 0x01;
 	ram[acc] <<= 1;
 	ram[acc] |= temp;
 }
 void cpu::opcode_24() {
-	auto d = rom[pc++];
-	setPSW_C(((short)ram[acc] + (short)d) > 255);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)rom[pc]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (rom[pc] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (rom[pc] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + rom[pc];
+	++pc;
 }
-void cpu::opcode_25() {}
-void cpu::opcode_26() {}
-void cpu::opcode_27() {}
-void cpu::opcode_28() {}
-void cpu::opcode_29() {}
-void cpu::opcode_2A() {}
-void cpu::opcode_2B() {}
-void cpu::opcode_2C() {}
-void cpu::opcode_2D() {}
-void cpu::opcode_2E() {}
-void cpu::opcode_2F() {}
+void cpu::opcode_25() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[pc]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[pc] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[pc] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[pc];
+	++pc;
+}
+void cpu::opcode_26() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[ram[r0]]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[ram[r0]] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[ram[r0]] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[ram[r0]];
+}
+void cpu::opcode_27() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[ram[r1]]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[ram[r1]] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[ram[r1]] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[ram[r1]];
+}
+void cpu::opcode_28() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r0]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r0] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r0] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[r0];
+}
+void cpu::opcode_29() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r1]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r1] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r1] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[r1];
+}
+void cpu::opcode_2A() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r2]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r2] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r2] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[r2];
+}
+void cpu::opcode_2B() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r3]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r3] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r3] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[r3];
+}
+void cpu::opcode_2C() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r4]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r4] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r4] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[r4];
+}
+void cpu::opcode_2D() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r5]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r5] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r5] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[r5];
+}
+void cpu::opcode_2E() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r6]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r6] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r6] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[r6];
+}
+void cpu::opcode_2F() {
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r7]) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r7] & 0x0F)) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r7] & 0x7F)) & 0x80);
+	ram[acc] = ram[acc] + ram[r7];
+}
 void cpu::opcode_30() {}
-void cpu::opcode_31() {}
-void cpu::opcode_32() {}
-void cpu::opcode_33() {}
-void cpu::opcode_34() {}
-void cpu::opcode_35() {}
-void cpu::opcode_36() {}
-void cpu::opcode_37() {}
-void cpu::opcode_38() {}
-void cpu::opcode_39() {}
-void cpu::opcode_3A() {}
-void cpu::opcode_3B() {}
-void cpu::opcode_3C() {}
-void cpu::opcode_3D() {}
-void cpu::opcode_3E() {}
-void cpu::opcode_3F() {}
-void cpu::opcode_40() {}
-void cpu::opcode_41() {}
+void cpu::opcode_31() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	high >>= 5;
+	++pc;
+	ushort address = pc;
+	ram[sp]++;
+	ram[ram[sp]] = address & 0xFF;
+	ram[sp]++;
+	ram[ram[sp]] = (address >> 8) & 0xFF;
+	pc = (high << 8) | low;
+}
+void cpu::opcode_32() {
+	pc = ram[ram[sp]];
+	ram[sp]--;
+	pc <<= 8;
+	pc |= ram[ram[sp]];
+	ram[sp]--;
+}
+void cpu::opcode_33() {
+	uchar c = PSW_C() ? 1 : 0;
+	auto temp = ram[acc] >> 7;
+	ram[acc] <<= 1;
+	ram[acc] |= c;
+	setPSW_C(temp);
+}
+void cpu::opcode_34() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)rom[pc] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (rom[pc] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (rom[pc] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + rom[pc];
+	++pc;
+}
+void cpu::opcode_35() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[rom[pc]] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[rom[pc]] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[rom[pc]] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[rom[pc]];
+	++pc;
+}
+void cpu::opcode_36() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[ram[r0]] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[ram[r0]] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[ram[r0]] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[ram[r0]];
+}
+void cpu::opcode_37() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[ram[r1]] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[ram[r1]] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[ram[r1]] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[ram[r1]];
+}
+void cpu::opcode_38() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r0] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r0] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r0] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[r0];
+}
+void cpu::opcode_39() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r1] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r1] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r1] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[r1];
+}
+void cpu::opcode_3A() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r2] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r2] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r2] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[r2];
+}
+void cpu::opcode_3B() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r3] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r3] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r3] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[r3];
+}
+void cpu::opcode_3C() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r4] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r4] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r4] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[r4];
+}
+void cpu::opcode_3D() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r5] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r5] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r5] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[r5];
+}
+void cpu::opcode_3E() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r6] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r6] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r6] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[r6];
+}
+void cpu::opcode_3F() {
+	int c = (PSW_C() ? 1 : 0);
+	setPSW_C(((unsigned int)ram[acc] + (unsigned int)ram[r7] + (unsigned int)c) > 255);
+	setPSW_AC(((ram[acc] & 0x0F) + (ram[r7] & 0x0F) + c) & 0xF0);
+	setPSW_OV(((ram[acc] & 0x7F) + (ram[r7] & 0x7F) + c) & 0x80);
+	ram[acc] = ram[acc] + ram[r7];
+}
+void cpu::opcode_40() {
+	schar offset = (schar)rom[pc++];
+	if ((PSW_C() >> 7) == 1)
+		pc += offset;
+}
+void cpu::opcode_41() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	++pc;
+	high >>= 5;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_42() {
 	ram[rom[pc]] |= ram[acc];
 	++pc;
@@ -718,8 +952,23 @@ void cpu::opcode_4E() {
 void cpu::opcode_4F() {
 	ram[acc] |= ram[r7];
 }
-void cpu::opcode_50() {}
-void cpu::opcode_51() {}
+void cpu::opcode_50() {
+	schar offset = (schar)rom[pc++];
+	if (PSW_C() == 0)
+		pc += offset;
+}
+void cpu::opcode_51() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	high >>= 5;
+	++pc;
+	ushort address = pc;
+	ram[sp]++;
+	ram[ram[sp]] = address & 0xFF;
+	ram[sp]++;
+	ram[ram[sp]] = (address >> 8) & 0xFF;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_52() {
 	ram[rom[pc]] &= ram[acc];
 	++pc;
@@ -766,8 +1015,18 @@ void cpu::opcode_5E() {
 void cpu::opcode_5F() {
 	ram[acc] &= ram[r7];
 }
-void cpu::opcode_60() {}
-void cpu::opcode_61() {}
+void cpu::opcode_60() {
+	schar offset = (schar)rom[pc++];
+	if (ram[acc] == 0)
+		pc += offset;
+}
+void cpu::opcode_61() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	++pc;
+	high >>= 5;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_62() {
 	ram[rom[pc]] ^= ram[acc];
 	++pc;
@@ -777,7 +1036,7 @@ void cpu::opcode_63() {
 	pc += 2;
 }
 void cpu::opcode_64() {
-	ram[acc] ^= rom[pc + 1];
+	ram[acc] ^= rom[pc];
 	pc += 1;
 }
 void cpu::opcode_65() {
@@ -820,9 +1079,22 @@ void cpu::opcode_70() {
 		pc = pc + (schar)rom[pc - 1];
 	}
 }
-void cpu::opcode_71() {}
+void cpu::opcode_71() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	high >>= 5;
+	++pc;
+	ushort address = pc;
+	ram[sp]++;
+	ram[ram[sp]] = address & 0xFF;
+	ram[sp]++;
+	ram[ram[sp]] = (address >> 8) & 0xFF;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_72() {}
-void cpu::opcode_73() {}
+void cpu::opcode_73() {
+	pc = ram[acc] + getDPTR();
+}
 void cpu::opcode_74() {
 	ram[acc] = rom[pc];
 	++pc;
@@ -864,11 +1136,17 @@ void cpu::opcode_7F() {
 	ram[r7] = rom[pc++];
 }
 void cpu::opcode_80() {
-	schar rel = (schar)ram[pc];
+	schar rel = (schar)rom[pc];
 	pc++;
 	pc = pc + rel;
 }
-void cpu::opcode_81() {}
+void cpu::opcode_81() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	++pc;
+	high >>= 5;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_82() {}
 void cpu::opcode_83() {
 	++pc;
@@ -919,24 +1197,179 @@ void cpu::opcode_8F() {
 	ram[pc] = ram[r7];
 	pc += 1;
 }
-void cpu::opcode_90() {}
-void cpu::opcode_91() {}
+void cpu::opcode_90() {
+	ushort address = (rom[pc] << 8) | rom[pc + 1];
+	setDPTR(address);
+	pc += 2;
+}
+void cpu::opcode_91() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	high >>= 5;
+	++pc;
+	ushort address = pc;
+	ram[sp]++;
+	ram[ram[sp]] = address & 0xFF;
+	ram[sp]++;
+	ram[ram[sp]] = (address >> 8) & 0xFF;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_92() {}
 void cpu::opcode_93() {}
-void cpu::opcode_94() {}
-void cpu::opcode_95() {}
-void cpu::opcode_96() {}
-void cpu::opcode_97() {}
-void cpu::opcode_98() {}
-void cpu::opcode_99() {}
-void cpu::opcode_9A() {}
-void cpu::opcode_9B() {}
-void cpu::opcode_9C() {}
-void cpu::opcode_9D() {}
-void cpu::opcode_9E() {}
-void cpu::opcode_9F() {}
+void cpu::opcode_94() {
+	unsigned char res = ram[acc] - rom[pc];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(rom[pc] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && rom[pc] > 0x7F) ||
+		(ram[acc] > 0x7F && rom[pc] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((rom[pc] + carry) & 0x0F) ||
+		carry && ((rom[pc] & 0x0F) == 0x0F));
+	++pc;
+}
+void cpu::opcode_95() {
+	unsigned char res = ram[acc] - ram[pc];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[pc] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[pc] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[pc] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[pc] + carry) & 0x0F) ||
+		carry && ((ram[pc] & 0x0F) == 0x0F));
+	++pc;
+}
+void cpu::opcode_96() {
+	unsigned char res = ram[acc] - ram[ram[r0]];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[ram[r0]] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[ram[r0]] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[ram[r0]] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[ram[r0]] + carry) & 0x0F) ||
+		carry && ((ram[ram[r0]] & 0x0F) == 0x0F));
+}
+void cpu::opcode_97() {
+	unsigned char res = ram[acc] - ram[ram[r1]];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[ram[r1]] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[ram[r1]] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[ram[r1]] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[ram[r1]] + carry) & 0x0F) ||
+		carry && ((ram[ram[r1]] & 0x0F) == 0x0F));
+}
+void cpu::opcode_98() {
+	unsigned char res = ram[acc] - ram[r0];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[r0] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[r0] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[r0] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[r0] + carry) & 0x0F) ||
+		carry && ((ram[r0] & 0x0F) == 0x0F));
+}
+void cpu::opcode_99() {
+	unsigned char res = ram[acc] - ram[r1];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[r1] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[r1] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[r1] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[r1] + carry) & 0x0F) ||
+		carry && ((ram[r1] & 0x0F) == 0x0F));
+}
+void cpu::opcode_9A() {
+	unsigned char res = ram[acc] - ram[r2];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[r2] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[r2] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[r2] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[r2] + carry) & 0x0F) ||
+		carry && ((ram[r2] & 0x0F) == 0x0F));
+}
+void cpu::opcode_9B() {
+	unsigned char res = ram[acc] - ram[r3];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[r3] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[r3] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[r3] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[r3] + carry) & 0x0F) ||
+		carry && ((ram[r3] & 0x0F) == 0x0F));
+}
+void cpu::opcode_9C() {
+	unsigned char res = ram[acc] - ram[r4];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[r4] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[r4] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[r4] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[r4] + carry) & 0x0F) ||
+		carry && ((ram[r4] & 0x0F) == 0x0F));
+}
+void cpu::opcode_9D() {
+	unsigned char res = ram[acc] - ram[r5];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[r5] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[r5] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[r5] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[r5] + carry) & 0x0F) ||
+		carry && ((ram[r5] & 0x0F) == 0x0F));
+}
+void cpu::opcode_9E() {
+	unsigned char res = ram[acc] - ram[r6];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[r6] + carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[r6] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[r6] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[r6] + carry) & 0x0F) ||
+		carry && ((ram[r6] & 0x0F) == 0x0F));
+}
+void cpu::opcode_9F() {
+	unsigned char res = ram[acc] - ram[r7];
+	auto carry = PSW_C();
+	if (carry)
+		res--;
+
+	setPSW_C(((unsigned int)ram[acc] < (unsigned int)(ram[r7]+ carry)));
+	setPSW_OV((ram[acc] < 0x80 && ram[r7] > 0x7F) ||
+		(ram[acc] > 0x7F && ram[r7] < 0x80));
+	setPSW_AC((ram[acc] & 0x0F) < ((ram[r7] + carry) & 0x0F) ||
+		carry && ((ram[r7] & 0x0F) == 0x0F));
+}
 void cpu::opcode_A0() {}
-void cpu::opcode_A1() {}
+void cpu::opcode_A1() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	++pc;
+	high >>= 5;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_A2() {}
 void cpu::opcode_A3() {}
 void cpu::opcode_A4() {}
@@ -982,30 +1415,161 @@ void cpu::opcode_AF() {
 	pc += 1;
 }
 void cpu::opcode_B0() {}
-void cpu::opcode_B1() {}
+void cpu::opcode_B1() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	high >>= 5;
+	++pc;
+	ushort address = pc;
+	ram[sp]++;
+	ram[ram[sp]] = address & 0xFF;
+	ram[sp]++;
+	ram[ram[sp]] = (address >> 8) & 0xFF;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_B2() {}
 void cpu::opcode_B3() {
 	setPSW_C(~PSW_C());
 }
-void cpu::opcode_B4() {}
-void cpu::opcode_B5() {}
-void cpu::opcode_B6() {}
-void cpu::opcode_B7() {}
-void cpu::opcode_B8() {}
-void cpu::opcode_B9() {}
-void cpu::opcode_BA() {}
-void cpu::opcode_BB() {}
-void cpu::opcode_BC() {}
-void cpu::opcode_BD() {}
-void cpu::opcode_BE() {}
-void cpu::opcode_BF() {}
-void cpu::opcode_C0() {}
-void cpu::opcode_C1() {}
+void cpu::opcode_B4() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[acc] != immediate)
+		pc += offset;
+	if (ram[acc] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_B5() {
+	auto immediate = ram[rom[pc++]];
+	schar offset = (schar)rom[pc++];
+	if (ram[acc] != immediate)
+		pc += offset;
+	if (ram[acc] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_B6() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[ram[r0]] != immediate)
+		pc += offset;
+	if (ram[ram[r0]] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_B7() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[ram[r1]] != immediate)
+		pc += offset;
+	if (ram[ram[r1]] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_B8() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[r0] != immediate)
+		pc += offset;
+	if (ram[r0] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_B9() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[r1] != immediate)
+		pc += offset;
+	if (ram[r1] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_BA() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[r2] != immediate)
+		pc += offset;
+	if (ram[r2] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_BB() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[r3] != immediate)
+		pc += offset;
+	if (ram[r3] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_BC() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[r4] != immediate)
+		pc += offset;
+	if (ram[r4] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_BD() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[r5] != immediate)
+		pc += offset;
+	if (ram[r5] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_BE() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[r6] != immediate)
+		pc += offset;
+	if (ram[r6] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_BF() {
+	auto immediate = rom[pc++];
+	schar offset = (schar)rom[pc++];
+	if (ram[r7] != immediate)
+		pc += offset;
+	if (ram[r7] < immediate)
+		setPSW_C(1);
+	else
+		setPSW_C(0);
+}
+void cpu::opcode_C0() {
+	ram[sp]++;
+	ram[ram[sp]] = ram[rom[pc++]];
+}
+void cpu::opcode_C1() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	++pc;
+	high >>= 5;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_C2() {}
 void cpu::opcode_C3() {
 	setPSW_C(0x00);
 }
-void cpu::opcode_C4() {}
+void cpu::opcode_C4() {
+	auto high = ram[acc] >> 4;
+	ram[acc] = (ram[acc] << 4) | high;
+}
 void cpu::opcode_C5() {
 	auto temp = ram[acc];
 	ram[acc] = ram[pc];
@@ -1061,12 +1625,39 @@ void cpu::opcode_CF() {
 	ram[acc] = ram[r7];
 	ram[r7] = temp;
 }
-void cpu::opcode_D0() {}
-void cpu::opcode_D1() {}
+void cpu::opcode_D0() {
+	ram[rom[pc++]] = ram[ram[sp]];
+	ram[sp]--;
+}
+void cpu::opcode_D1() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	high >>= 5;
+	++pc;
+	ushort address = pc;
+	ram[sp]++;
+	ram[ram[sp]] = address & 0xFF;
+	ram[sp]++;
+	ram[ram[sp]] = (address >> 8) & 0xFF;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_D2() {}
-void cpu::opcode_D3() {}
-void cpu::opcode_D4() {}
-void cpu::opcode_D5() {}
+void cpu::opcode_D3() {
+	setPSW_C(1);
+}
+void cpu::opcode_D4() {
+	if ((ram[acc] & 0x0F) > 9 || (PSW_AC() >> 6) == 1)
+		ram[acc] += 6;
+	if ((ram[acc] & 0xF0) > 9 || (PSW_C() >> 7) == 1)
+		ram[acc] += 0x60;
+}
+void cpu::opcode_D5() {
+	ram[rom[pc++]] -= 1;
+	schar offset = (schar)rom[pc++];
+	if (ram[rom[pc++]] != 0) {
+		pc = pc + offset;
+	}
+}
 void cpu::opcode_D6() {
 	auto temp = ram[acc];
 	auto temp1 = ram[ram[r0]];
@@ -1144,14 +1735,24 @@ void cpu::opcode_DF() {
 	}
 }
 void cpu::opcode_E0() {}
-void cpu::opcode_E1() {}
-void cpu::opcode_E2() {}
-void cpu::opcode_E3() {}
+void cpu::opcode_E1() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	++pc;
+	high >>= 5;
+	pc = (high << 8) | low;
+}
+void cpu::opcode_E2() {
+	ram[acc] = ram[ram[r0]];
+}
+void cpu::opcode_E3() {
+	ram[acc] = ram[ram[r1]];
+}
 void cpu::opcode_E4() {
 	ram[acc] = 0x00;
 }
 void cpu::opcode_E5() {
-	ram[acc] = ram[pc];
+	ram[acc] = ram[rom[pc]];
 	++pc;
 }
 void cpu::opcode_E6() {
@@ -1185,7 +1786,18 @@ void cpu::opcode_EF() {
 	ram[acc] = ram[r7];
 }
 void cpu::opcode_F0() {}
-void cpu::opcode_F1() {}
+void cpu::opcode_F1() {
+	uchar low = rom[pc];
+	ushort high = rom[pc - 1];
+	high >>= 5;
+	++pc;
+	ushort address = pc;
+	ram[sp]++;
+	ram[ram[sp]] = address & 0xFF;
+	ram[sp]++;
+	ram[ram[sp]] = (address >> 8) & 0xFF;
+	pc = (high << 8) | low;
+}
 void cpu::opcode_F2() {
 	ram[ram[r0]] = ram[acc];
 }
